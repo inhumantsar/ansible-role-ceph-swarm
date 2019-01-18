@@ -1,0 +1,56 @@
+---
+ceph_cluster_name: ceph
+ceph_image: ceph/daemon
+
+
+# for secrets generation, a one-off activity irl but common in tests
+ceph_secrets_generate: false    # set to true to enable generation
+ceph_secrets_dest: ~            # if null, a temp dir will be created
+
+
+# each cluster requires a unique, consistent filesystem ID (fsid)
+# if left as null, an ephemeral fsid will be generated but 
+# users must provide their own for any long-lived deployments.
+ceph_fsid: ~
+
+
+# config file vars - please prune and simplify me
+cephx: true
+ceph_ip_version: ipv4
+ceph_public_network: 0.0.0.0/0
+ceph_cluster_network: "{{ ceph_public_network | regex_replace(' ', '') }}"
+ceph_release: mimic
+
+
+# monitor options
+ceph_mon_name: mon              # docker suffixes with ".<replica number>"
+ceph_mon_replicas: 3
+ceph_mon_group_name: mons
+
+# osd options
+ceph_osd_name: osd              
+ceph_osd_group_name: osds
+
+
+# rgw options
+ceph_rgw_name: rgw              # docker suffixes with ".<replica number>"
+ceph_rgw_group_name: rgws
+ceph_rgw_replicas: 1
+ceph_rgw_frontend_type
+
+ceph_mds_group_name: mdss
+ceph_nfs_group_name: nfss
+ceph_rbdmirror_group_name: rbdmirrors
+ceph_client_group_name: clients
+ceph_iscsi_gw_group_name: iscsigws
+ceph_mgr_group_name: mgrs
+
+
+
+ceph_release_num:
+  jewel: 10
+  kraken: 11
+  luminous: 12
+  mimic: 13
+  nautilus: 14
+  dev: 99

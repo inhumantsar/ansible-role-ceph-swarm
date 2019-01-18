@@ -1,0 +1,38 @@
+---
+# tasks file for ceph-swarm
+- debug: msg="Starting role ceph-swarm v0.1.0"
+
+- name: generate secrets, if necessary
+  import_tasks: generate_secrets.yml
+  when:
+    - ceph_secrets_generate 
+
+# if necessary, drop ceph.conf on the host from a template  
+- name: generate ceph.conf file for the host, if necessary
+
+### see ceph-ansible playbooks for a good template to adapt.
+# https://github.com/ceph/ceph-ansible/blob/master/roles/ceph-config/templates/ceph.conf.j2
+
+
+
+- name: make sure data paths exist
+  file:
+    state: directory
+    path: "{{ item }}"
+  with_items:
+    - ceph_osd_data_path
+  when: 
+    - "ceph_osd_data_path != ''"
+    - not ceph_remove
+
+- name: write template to temp location
+  template:
+    src: templates/docker-compose.yml.j2
+    dest: "/tmp/{{ceph_stack_name}}-docker-compose.yml"
+  when: not ceph_remove
+
+- name: run docker stack
+  shell: "docker stack deploy -c /tmp/{{ceph_stack_name}}-docker-compose.yml {{ceph_stack_name}}" 
+  when: not ceph_remove
+
+

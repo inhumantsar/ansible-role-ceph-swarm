@@ -1,0 +1,72 @@
+#jinja2: trim_blocks: "true", lstrip_blocks: "true"
+# {{ ansible_managed }}
+
+# adapted from commit a86c2b8 of the ceph-ansible project's config role template
+# https://github.com/ceph/ceph-ansible/blob/a86c2b85263f84891e2cbf7e782f7ac8891257b3/roles/ceph-config/templates/ceph.conf.j2
+
+
+[global]
+{% if not cephx %}
+auth cluster required = none
+auth service required = none
+auth client required = none
+auth supported = none
+{% endif %}
+{% if ceph_ip_version == 'ipv6'  %}
+ms bind ipv6 = true
+{% endif %}
+
+{% if ceph_release not in ['jewel', 'kraken', 'luminous'] %}
+# let's force the admin socket the way it was so we can properly check for existing instances
+# also the line $cluster-$name.$pid.$cctid.asok is only needed when running multiple instances
+# of the same daemon, thing ceph-ansible cannot do at the time of writing
+admin socket = "$run_dir/$cluster-$name.asok"
+{% endif %}
+
+{% if ceph_mon_replicas > 0 %}
+mon initial members = {% for i in range(0, ceph_mon_replicas) -%}
+    {{ ceph_mon_name }}.{{ i }}{% if not loop.last %},{% endif -%}
+    {% endfor -%}
+mon host = {% for i in range(0, ceph_mon_replicas) -%}
+    {{ ceph_mon_name }}.{{ i }}{% if not loop.last %},{% endif -%}
+    {% endfor -%}
+{% endif %}
+
+fsid = {{ ceph_fsid if ceph_fsid is not None else 99999999 | random | to_uuid }}
+
+# containerized deployments log to stdout
+log file = /dev/null
+mon cluster log file = /dev/null
+
+{% if ceph_public_network is defined %}
+public network = {{ ceph_public_network | regex_replace(' ', '') }}
+{% endif %}
+{% if cluster_network is defined %}
+cluster network = {{ cluster_network | regex_replace(' ', '') }}
+{% endif %}
+
+[osd]
+# ...crickets... not much to configure when using a directory directly
+
+{% if ceph_rgw_replicas > 0 %}
+{% for i in range(0, ceph_rgw_replicas) %}
+{% set _rgw_hostname = ceph_rgw_name + "." + i %}
+[client.rgw.{{ _rgw_hostname }}]
+host = {{ _rgw_hostname }}
+keyring = /var/lib/ceph/radosgw/{{ ceph_cluster_name }}-rgw.{{ _rgw_hostname }}/keyring
+log file = /dev/null
+rgw frontends = {{ ceph_rgw_frontend_type }} {{ 'port' if rgw_frontend_type == 'civetweb' else 'endpoint' }}={{ hostvars[host]['_radosgw_address'] }}:{{ radosgw_frontend_port }} {{ radosgw_frontend_options }}
+{% endfor %}
+{% endif %}
+
+{% if inventory_hostname in groups.get(nfs_group_name, []) and inventory_hostname not in groups.get(rgw_group_name, []) %}
+{% for host in groups[nfs_group_name] %}
+{% set _rgw_hostname = hostvars[host]['rgw_hostname'] | default(hostvars[host]['ansible_hostname']) %}
+{% if nfs_obj_gw %}
+[client.rgw.{{ _rgw_hostname }}]
+host = {{ _rgw_hostname }}
+keyring = /var/lib/ceph/radosgw/{{ ceph_cluster_name }}-rgw.{{ _rgw_hostname }}/keyring
+log file = /var/log/ceph/{{ ceph_cluster_name }}-rgw-{{ hostvars[host]['ansible_hostname'] }}.log
+{% endif %}
+{% endfor %}
+{% endif %}
